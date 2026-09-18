@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GFA — Centro de Mando</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+  /* ============ TOKENS ============ */
+  :root{
+    --void:        #05060a;
+    --void-2:      #0a0b10;
+    --panel:       rgba(10,14,22,0.72);
+    --panel-line:  rgba(255,255,255,0.1);
+    --ink:         #14151b;
+    --ink-inv:     #f4f6f8;
+    --ink-dim-inv: #aab2c4;
+
+    --vice-mag:    #ff2d78;
+    --vice-cyan:   #17c9d6;
+
+    --fin-1:#071a14; --fin-2:#0d3226; --fin-a:#26e0a0; --fin-b:#e8c46b;
+    --fit-1:#10160c; --fit-2:#1c2a10; --fit-a:#baff3d; --fit-b:#ffb020;
+    --ale-1:#0a0d16; --ale-2:#141b2c; --ale-a:#e8b93f; --ale-b:#ff4b4b;
+    --mer-1:#1a0a16; --mer-2:#341128; --mer-a:#ff2d78; --mer-b:#ffffff;
+    --mis-1:#0e0a22; --mis-2:#201246; --mis-a:#8b6bff; --mis-b:#22d3ee;
+    --idi-1:#061620; --idi-2:#0c2c3a; --idi-a:#22d3ee; --idi-b:#8b6bff;
+
+    --ease: cubic-bezier(.16,.84,.24,1);
+  }
+
+  *,*::before,*::after{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; color:var(--ink-inv); font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; background:var(--void);
+  }
+  img,svg{ max-width:100%; display:block; }
+  button{ font-family:inherit; }
+  :focus-visible{ outline:2px solid var(--vice-cyan); outline-offset:3px; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; }
+  }
+
+  .h-display{ font-family:'Bebas Neue',sans-serif; letter-spacing:0.02em; line-height:0.88; }
+  .h-hud{ font-family:'Rajdhani',sans-serif; font-weight:600; letter-spacing:0.09em; }
+
+  /* ============ INTRO ============ */
+  #intro{
+    position:fixed; inset:0; z-index:300;
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    background:
+      radial-gradient(60% 50% at 50% 45%, rgba(255,45,120,0.16), transparent 70%),
+      linear-gradient(180deg, #05060a 0%, #0a0c13 100%);
+    cursor:pointer;
+    transition:opacity .7s var(--ease), visibility .7s;
+  }
+  #intro .grain{
+    position:absolute; inset:0;
+    background-image:linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size:38px 38px;
+    mask-image:radial-gradient(70% 60% at 50% 50%, black, transparent);
+  }
+  .intro-logo{ position:relative; z-index:1; font-size:clamp(64px,16vw,180px); color:#f4f6f8; animation:breathe 2.2s ease-in-out infinite; }
+  @keyframes breathe{
+    0%,100%{ text-shadow:0 0 22px rgba(23,201,214,0.35), 0 0 60px rgba(255,45,120,0.18); opacity:0.88; }
+    50%{ text-shadow:0 0 42px rgba(23,201,214,0.65), 0 0 110px rgba(255,45,120,0.4); opacity:1; }
+  }
+  .intro-status{ position:relative; z-index:1; margin-top:18px; font-family:'Rajdhani',sans-serif; font-weight:600; font-size:12px; letter-spacing:0.3em; color:var(--ink-dim-inv); }
+  .intro-bar{ position:relative; z-index:1; margin-top:14px; width:180px; height:2px; background:rgba(255,255,255,0.12); overflow:hidden; }
+  .intro-bar::after{ content:''; position:absolute; inset:0; width:40%; height:100%; background:linear-gradient(90deg, transparent, var(--vice-cyan), transparent); animation:sweep 1.3s ease-in-out infinite; }
+  @keyframes sweep{ 0%{ transform:translateX(-120%);} 100%{ transform:translateX(340%);} }
+
+  body.intro-done #intro{ opacity:0; visibility:hidden; pointer-events:none; }
+
+  /* ============ APP SHELL ============ */
+  .app{
+    height:100svh; display:flex; flex-direction:column;
+    background:radial-gradient(120% 90% at 50% 0%, #0f1119 0%, var(--void) 60%);
+    overflow:hidden;
+    opacity:0; transform:scale(1.02);
+    transition:opacity .8s var(--ease) .15s, transform .9s var(--ease) .15s;
+  }
+  body.intro-done .app{ opacity:1; transform:none; }
+
+  .topbar{ flex:0 0 auto; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:12px clamp(14px,3vw,32px) 0; }
+  .status-chip{
+    font-family:'Rajdhani',sans-serif; font-weight:600; font-size:11px; letter-spacing:0.12em;
+    color:var(--ink-dim-inv); border:1px solid rgba(255,255,255,0.12); padding:5px 11px;
+    background:rgba(255,255,255,0.04); display:flex; align-items:center; gap:7px;
+  }
+  .status-chip i{ width:6px; height:6px; background:var(--fin-a); display:inline-block; box-shadow:0 0 8px var(--fin-a); }
+
+  /* ============ STAGE / MOSAIC ============ */
+  .stage{ flex:1 1 auto; min-height:0; position:relative; padding:10px clamp(10px,2.2vw,26px) 0; }
+  .collage{
+    height:100%; display:grid; gap:5px; background:var(--void);
+    grid-template-columns:1.15fr 0.85fr 0.8fr 1fr;
+    grid-template-rows:1fr 0.85fr 1fr;
+    grid-template-areas:
+      "fin fin fit fit"
+      "ale core core mer"
+      "ale mis idi idi";
+  }
+
+  .core{
+    grid-area:core; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:var(--void); position:relative; z-index:2;
+  }
+  .core-logo{
+    font-size:clamp(30px,3.6vw,46px); color:var(--ink-inv);
+    -webkit-text-stroke:1.5px rgba(255,255,255,0.15);
+  }
+  .core-tag{ font-family:'Rajdhani',sans-serif; font-weight:600; font-size:9px; letter-spacing:0.34em; color:var(--ink-dim-inv); margin-top:3px; }
+
+  .tile{
+    position:relative; border:0; text-align:left; color:var(--ink-inv);
+    cursor:pointer; overflow:hidden; isolation:isolate;
+    display:flex; flex-direction:column; justify-content:flex-end;
+    padding:clamp(10px,1.6vw,20px);
+    transition:filter .4s ease, transform .4s var(--ease);
+  }
+  .tile::before{
+    content:''; position:absolute; inset:0; z-index:-1;
+    background-image:radial-gradient(rgba(255,255,255,0.09) 1px, transparent 1.4px);
+    background-size:9px 9px; opacity:0.4; mix-blend-mode:overlay;
+  }
+  .tile:hover, .tile:focus-visible{ filter:brightness(1.12); transform:scale(1.012); z-index:6; }
+
+  .tile-fin{ grid-area:fin; background:linear-gradient(150deg, var(--fin-2), var(--fin-1)); clip-path:polygon(0 0,100% 0,100% 100%,0 100%,0 22px,10px 22px,10px 0); --acc:var(--fin-a); }
+  .tile-fit{ grid-area:fit; background:linear-gradient(150deg, var(--fit-2), var(--fit-1)); clip-path:polygon(0 0,100% 0,100% 100%,22px 100%,22px calc(100% - 10px),0 calc(100% - 10px)); --acc:var(--fit-a); }
+  .tile-ale{ grid-area:ale; background:linear-gradient(160deg, var(--ale-2), var(--ale-1)); clip-path:polygon(0 0,100% 0,100% calc(100% - 20px),calc(100% - 20px) 100%,0 100%); --acc:var(--ale-a); }
+  .tile-mer{ grid-area:mer; background:linear-gradient(160deg, var(--mer-2), var(--mer-1)); clip-path:polygon(18px 0,100% 0,100% 100%,0 100%,0 18px); --acc:var(--mer-a); }
+  .tile-mis{ grid-area:mis; background:linear-gradient(160deg, var(--mis-2), var(--mis-1)); clip-path:polygon(0 0,100% 0,100% 100%,16px 100%,0 calc(100% - 16px)); --acc:var(--mis-a); }
+  .tile-idi{ grid-area:idi; background:linear-gradient(150deg, var(--idi-2), var(--idi-1)); clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,0 100%); --acc:var(--idi-a); }
+
+  .tile-prop{ position:absolute; z-index:-1; color:var(--acc); opacity:0.5; transition:transform .8s var(--ease); }
+  .tile-fin .tile-prop{ right:-8%; top:-16%; width:46%; transform:rotate(-6deg); }
+  .tile-fit .tile-prop{ right:-6%; top:-18%; width:44%; transform:rotate(8deg); }
+  .tile-ale .tile-prop{ left:-10%; bottom:-14%; width:56%; transform:rotate(-4deg); }
+  .tile-mer .tile-prop{ right:-14%; bottom:-16%; width:52%; transform:rotate(10deg); }
+  .tile-mis .tile-prop{ left:-8%; bottom:-14%; width:48%; transform:rotate(5deg); }
+  .tile-idi .tile-prop{ right:-8%; bottom:-20%; width:44%; transform:rotate(-7deg); }
+  .tile:hover .tile-prop, .tile:focus-visible .tile-prop{ transform:scale(1.08) rotate(0deg); }
+
+  .tile-index{ font-size:9.5px; color:var(--acc); margin-bottom:auto; }
+  .tile-title{ font-size:clamp(18px,2.6vw,34px); margin:6px 0 2px; }
+  .tile-desc{ font-size:10.5px; line-height:1.4; max-width:26ch; color:rgba(244,246,248,0.68); }
+
+  .tile-enter{ position:absolute; top:10px; right:12px; font-size:9.5px; color:var(--acc); opacity:0; transform:translateX(-6px); transition:opacity .3s ease, transform .3s ease; }
+  .tile:hover .tile-enter, .tile:focus-visible .tile-enter{ opacity:1; transform:none; }
+
+  .eq{ position:absolute; top:10px; left:12px; display:flex; align-items:flex-end; gap:2.5px; height:13px; opacity:0; transition:opacity .3s ease; }
+  .tile:hover .eq, .tile:focus-visible .eq{ opacity:1; }
+  .eq i{ width:2.5px; background:var(--acc); animation:eqBounce 900ms ease-in-out infinite; }
+  .eq i:nth-child(1){ animation-delay:0ms; } .eq i:nth-child(2){ animation-delay:120ms; } .eq i:nth-child(3){ animation-delay:240ms; } .eq i:nth-child(4){ animation-delay:80ms; } .eq i:nth-child(5){ animation-delay:200ms; }
+  @keyframes eqBounce{ 0%,100%{ height:3px;} 50%{ height:13px;} }
+
+  /* smaller cells get tighter type so 6 tiles still read cleanly */
+  .tile-mer .tile-title, .tile-mis .tile-title{ font-size:clamp(16px,2.2vw,26px); }
+  .tile-mer .tile-desc, .tile-mis .tile-desc{ display:none; }
+
+  /* ============ HINT BAR ============ */
+  .hintbar{
+    flex:0 0 auto; display:flex; align-items:center; justify-content:space-between;
+    padding:8px clamp(14px,3vw,32px) 12px;
+    font-family:'Rajdhani',sans-serif; font-weight:600; font-size:10px; letter-spacing:0.13em; color:var(--ink-dim-inv);
+  }
+  .hintbar .keys{ display:flex; gap:16px; }
+  .hintbar kbd{ font-family:inherit; background:rgba(255,255,255,0.06); padding:2px 7px; margin-right:5px; }
+
+  /* ============ MOBILE ============ */
+  @media (max-width:900px){
+    html,body{ height:auto; }
+    .app{ height:auto; min-height:100svh; }
+    .stage{
+      display:block; position:relative;
+      padding:16px 90px 16px clamp(14px,4vw,26px);
+    }
+    /* vertical spine linking the stacked blocks to the hub, echoing the sketch */
+    .stage::after{
+      content:''; position:absolute; right:44px; top:22px; bottom:22px; width:1px;
+      background:linear-gradient(180deg, transparent, rgba(255,255,255,0.22) 12%, rgba(255,255,255,0.22) 88%, transparent);
+      z-index:1;
+    }
+    .collage{
+      display:flex; flex-direction:column; gap:10px; height:auto;
+    }
+    .tile{ min-height:112px; clip-path:none !important; order:2; }
+    .tile-mer .tile-desc, .tile-mis .tile-desc{ display:block; }
+
+    /* exact stacking order from the sketch */
+    .tile-mis{ order:1; }
+    .tile-fit{ order:2; }
+    .tile-mer{ order:3; }
+    .tile-fin{ order:4; }
+    .tile-idi{ order:5; }
+    .tile-ale{ order:6; }
+
+    /* hub: smaller GFA badge, fixed to the right, vertically centered like the sketch */
+    .core{
+      position:absolute; right:12px; top:50%; transform:translate(0,-50%);
+      width:64px; height:64px; border-radius:50%;
+      background:radial-gradient(circle at 35% 30%, rgba(255,255,255,0.06), transparent 65%), var(--void);
+      border:1px solid rgba(255,255,255,0.16);
+      box-shadow:0 0 22px rgba(23,201,214,0.16);
+      z-index:5; order:initial;
+    }
+    .core-logo{ font-size:16px; }
+    .core-tag{ font-size:6px; letter-spacing:0.18em; margin-top:1px; }
+  }
+
+  /* ============ MISSION PANEL ============ */
+  .wipe{ position:fixed; inset:0; z-index:90; background:var(--acc,var(--vice-mag)); clip-path:circle(0% at var(--ox,50%) var(--oy,50%)); pointer-events:none; }
+  .wipe.run{ animation:wipeIn .55s var(--ease) forwards; }
+  .wipe.out{ animation:wipeOut .5s var(--ease) forwards; }
+  @keyframes wipeIn{ to{ clip-path:circle(140% at var(--ox,50%) var(--oy,50%)); } }
+  @keyframes wipeOut{ from{ clip-path:circle(140% at var(--ox,50%) var(--oy,50%)); } to{ clip-path:circle(0% at var(--ox,50%) var(--oy,50%)); } }
+
+  .mission{ position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:40px 20px; visibility:hidden; }
+  .mission.active{ visibility:visible; }
+  .mission-backdrop{ position:absolute; inset:0; background-size:cover; background-position:center; filter:saturate(1.1) brightness(0.55) blur(1px); opacity:0; transition:opacity .5s ease .1s; }
+  .mission.active .mission-backdrop{ opacity:1; }
+  .mission-backdrop::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg, rgba(4,6,10,0.55), rgba(4,6,10,0.9)); }
+
+  .mission-panel{
+    position:relative; z-index:2; width:min(760px,100%);
+    background:var(--panel); backdrop-filter:blur(18px) saturate(140%); -webkit-backdrop-filter:blur(18px) saturate(140%);
+    border:1px solid rgba(255,255,255,0.14); color:var(--ink-inv);
+    padding:clamp(28px,5vw,56px);
+    opacity:0; transform:translateY(18px) scale(.985);
+    transition:opacity .45s var(--ease) .18s, transform .45s var(--ease) .18s;
+  }
+  .mission.active .mission-panel{ opacity:1; transform:none; }
+
+  .mission-eyebrow{ font-family:'Rajdhani',sans-serif; font-weight:600; letter-spacing:0.2em; font-size:12px; color:var(--acc,var(--vice-cyan)); }
+  .mission-title{ font-family:'Bebas Neue',sans-serif; font-size:clamp(42px,7.5vw,78px); margin:4px 0 14px; line-height:0.95; }
+  .mission-text{ color:var(--ink-dim-inv); font-size:15px; line-height:1.7; max-width:52ch; margin:0 0 30px; }
+
+  .mission-list{ list-style:none; margin:0 0 34px; padding:0; }
+  .mission-list li{ display:flex; align-items:center; justify-content:space-between; padding:14px 2px; border-bottom:1px solid rgba(255,255,255,0.08); font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:600; }
+  .mission-list li span.tag{ font-size:11px; letter-spacing:0.1em; color:var(--acc,var(--vice-cyan)); font-weight:600; }
+
+  .mission-actions{ display:flex; gap:14px; flex-wrap:wrap; }
+  .btn{ font-family:'Rajdhani',sans-serif; font-weight:700; letter-spacing:0.08em; font-size:13px; padding:13px 26px; border:1px solid transparent; cursor:pointer; transition:transform .25s ease, background .25s ease, border-color .25s ease; }
+  .btn-primary{ background:var(--acc,var(--vice-cyan)); color:#04060a; }
+  .btn-primary:hover{ transform:translateY(-2px); }
+  .btn-ghost{ background:transparent; color:var(--ink-inv); border-color:rgba(255,255,255,0.25); }
+  .btn-ghost:hover{ border-color:var(--acc,var(--vice-cyan)); color:var(--acc,var(--vice-cyan)); }
+
+  .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+</style>
+</head>
+<body>
+
+  <div id="intro" role="button" aria-label="Saltar intro" tabindex="0">
+    <div class="grain" aria-hidden="true"></div>
+    <div class="intro-logo h-display">GFA</div>
+    <div class="intro-status h-hud">CARGANDO SESIÓN</div>
+    <div class="intro-bar" aria-hidden="true"></div>
+  </div>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="status-chip"><i></i>EN LÍNEA</div>
+      <div class="status-chip" id="clock">--:--</div>
+    </header>
+
+    <main class="stage">
+      <div class="collage">
+
+        <button class="tile tile-fin" data-mission="fin" aria-haspopup="dialog">
+          <svg class="tile-prop" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="7" aria-hidden="true">
+            <path d="M100 20v160M135 45c0-13-14-22-35-22s-35 11-35 24 14 19 35 24 35 11 35 24-16 24-35 24-35-9-35-22"/>
+          </svg>
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="tile-enter h-hud">ENTRAR →</span>
+          <span class="tile-index h-hud">01 · CAPITAL</span>
+          <h2 class="tile-title h-display">FINANZAS</h2>
+          <p class="tile-desc">Cursos y mentorías de inversión.</p>
+        </button>
+
+        <button class="tile tile-fit" data-mission="fit" aria-haspopup="dialog">
+          <svg class="tile-prop" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="7" aria-hidden="true">
+            <path d="M20 100h20M160 100h20M50 60v80M150 60v80M50 100h100"/>
+          </svg>
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="tile-enter h-hud">ENTRAR →</span>
+          <span class="tile-index h-hud">02 · RENDIMIENTO</span>
+          <h2 class="tile-title h-display">FITNESS</h2>
+          <p class="tile-desc">Membresías de entrenamiento y nutrición.</p>
+        </button>
+
+        <button class="tile tile-ale" data-mission="ale" aria-haspopup="dialog">
+          <svg class="tile-prop" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="7" aria-hidden="true">
+            <path d="M40 160V70l60-40 60 40v90M40 160h120M70 160v-50h20v50M110 160v-50h20v50"/>
+          </svg>
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="tile-enter h-hud">ENTRAR →</span>
+          <span class="tile-index h-hud">03 · ASESORÍA</span>
+          <h2 class="tile-title h-display">ALEMANIA</h2>
+          <p class="tile-desc">Trámites y apertura de empresas.</p>
+        </button>
+
+        <button class="tile tile-mer" data-mission="mer" aria-haspopup="dialog">
+          <svg class="tile-prop" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="7" aria-hidden="true">
+            <path d="M60 70V50a40 40 0 0180 0v20M40 70h120l-10 100H50L40 70z"/>
+          </svg>
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="tile-enter h-hud">ENTRAR →</span>
+          <span class="tile-index h-hud">04 · TIENDA</span>
+          <h2 class="tile-title h-display">MERCH</h2>
+          <p class="tile-desc">Tienda oficial de GFA.</p>
+        </button>
+
+        <div class="core" aria-hidden="true">
+          <div class="core-logo h-display">GFA</div>
+          <div class="core-tag">CENTRO DE MANDO</div>
+        </div>
+
+        <button class="tile tile-mis" data-mission="mis" aria-haspopup="dialog">
+          <svg class="tile-prop" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="7" aria-hidden="true">
+            <path d="M100 20v60M100 80l-45 35M100 80l45 35M55 115v45M145 115v45M100 148v27"/>
+            <circle cx="100" cy="20" r="8"/><circle cx="55" cy="115" r="8"/><circle cx="145" cy="115" r="8"/>
+          </svg>
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="tile-enter h-hud">ENTRAR →</span>
+          <span class="tile-index h-hud">05 · PROGRESIÓN</span>
+          <h2 class="tile-title h-display">MISIONES</h2>
+          <p class="tile-desc">Hábitos y desarrollo personal.</p>
+        </button>
+
+        <button class="tile tile-idi" data-mission="idi" aria-haspopup="dialog">
+          <svg class="tile-prop" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="7" aria-hidden="true">
+            <path d="M40 60h70M40 60v90h60M75 60c0 45-15 75-40 90M75 78c10 16 26 26 45 30M110 160l30-70 30 70M118 140h44"/>
+          </svg>
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="tile-enter h-hud">ENTRAR →</span>
+          <span class="tile-index h-hud">06 · IDIOMAS</span>
+          <h2 class="tile-title h-display">IDIOMAS</h2>
+          <p class="tile-desc">Alemán e inglés, con seguimiento real.</p>
+        </button>
+
+      </div>
+    </main>
+
+    <footer class="hintbar">
+      <span>GFA ONLINE — PROTOTIPO</span>
+      <span class="keys"><span><kbd>Clic</kbd>Entrar</span><span><kbd>Esc</kbd>Volver</span></span>
+    </footer>
+  </div>
+
+  <div class="wipe" id="wipe" aria-hidden="true"></div>
+
+  <div class="mission" id="mission" role="dialog" aria-modal="true" aria-labelledby="missionTitle">
+    <div class="mission-backdrop" id="missionBg"></div>
+    <div class="mission-panel">
+      <p class="mission-eyebrow h-hud" id="missionEyebrow"></p>
+      <h2 class="mission-title" id="missionTitle"></h2>
+      <p class="mission-text" id="missionText"></p>
+      <ul class="mission-list" id="missionList"></ul>
+      <div class="mission-actions">
+        <button class="btn btn-primary" id="missionGo">Continuar</button>
+        <button class="btn btn-ghost" id="missionBack">Volver a GFA</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var intro = document.getElementById('intro');
+
+  function finishIntro(){ document.body.classList.add('intro-done'); }
+  if(reduce){
+    finishIntro();
+  } else {
+    var timer = setTimeout(finishIntro, 2400);
+    intro.addEventListener('click', function(){ clearTimeout(timer); finishIntro(); });
+    intro.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ clearTimeout(timer); finishIntro(); } });
+  }
+
+  var clockEl = document.getElementById('clock');
+  function tick(){
+    var d = new Date();
+    clockEl.textContent = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  }
+  tick(); setInterval(tick, 15000);
+
+  var DATA = {
+    fin: {
+      acc:'var(--fin-a)', wipe:'var(--fin-a)',
+      bgGrad:'radial-gradient(120% 90% at 80% 10%, rgba(38,224,160,0.25), transparent 55%), linear-gradient(160deg, var(--fin-2), var(--fin-1))',
+      eyebrow:'01 · CAPITAL', title:'FINANZAS',
+      text:'Cursos y mentorías de inversión en construcción: aprende a leer el mercado y arma tu propia estrategia de capital.',
+      items:['Curso base','Fundamentos','Mentoría 1:1','Cupos limitados','Comunidad','+120 inversores']
+    },
+    fit: {
+      acc:'var(--fit-a)', wipe:'var(--fit-a)',
+      bgGrad:'radial-gradient(120% 90% at 20% 10%, rgba(186,255,61,0.25), transparent 55%), linear-gradient(160deg, var(--fit-2), var(--fit-1))',
+      eyebrow:'02 · RENDIMIENTO', title:'FITNESS',
+      text:'Membresías de entrenamiento en construcción: rutinas, seguimiento y nutrición pensados para tu nivel.',
+      items:['Plan actual','Fuerza 12 semanas','Nutrición','Plan a medida','Racha activa','12 días']
+    },
+    ale: {
+      acc:'var(--ale-a)', wipe:'var(--ale-a)',
+      bgGrad:'radial-gradient(120% 90% at 30% 0%, rgba(232,185,63,0.22), transparent 55%), linear-gradient(160deg, var(--ale-2), var(--ale-1))',
+      eyebrow:'03 · ASESORÍA ALEMANIA', title:'ALEMANIA',
+      text:'Asesoría de trámites y apertura de empresas en Alemania en construcción: papeleo claro, sin sorpresas.',
+      items:['Trámite activo','Residencia','Constitución','GmbH / Freelance','Próxima cita','Por confirmar']
+    },
+    mer: {
+      acc:'var(--mer-a)', wipe:'var(--mer-a)',
+      bgGrad:'radial-gradient(120% 90% at 70% 20%, rgba(255,45,120,0.28), transparent 55%), linear-gradient(160deg, var(--mer-2), var(--mer-1))',
+      eyebrow:'04 · TIENDA', title:'MERCH',
+      text:'Tienda oficial en construcción: la ropa y los accesorios de GFA, directo a tu puerta.',
+      items:['Colección','Temporada 01','Envíos','Nacional e internacional','Lanzamiento','Próximamente']
+    },
+    mis: {
+      acc:'var(--mis-a)', wipe:'var(--mis-a)',
+      bgGrad:'radial-gradient(120% 90% at 50% 0%, rgba(139,107,255,0.28), transparent 55%), linear-gradient(160deg, var(--mis-2), var(--mis-1))',
+      eyebrow:'05 · PROGRESIÓN', title:'MISIONES',
+      text:'Árbol de misiones en construcción: hábitos como nodos desbloqueables y experiencia acumulada.',
+      items:['Nivel actual','Nivel 9','XP para subir','160 XP','Hábito en racha','Lectura diaria']
+    },
+    idi: {
+      acc:'var(--idi-a)', wipe:'var(--idi-a)',
+      bgGrad:'radial-gradient(120% 90% at 30% 10%, rgba(34,211,238,0.25), transparent 55%), linear-gradient(160deg, var(--idi-2), var(--idi-1))',
+      eyebrow:'06 · IDIOMAS', title:'IDIOMAS',
+      text:'Cursos de idiomas en construcción: alemán e inglés con seguimiento real de tu progreso.',
+      items:['Curso activo','Alemán B1','Racha de práctica','9 días','Próxima clase','Miércoles']
+    }
+  };
+
+  var wipe = document.getElementById('wipe');
+  var mission = document.getElementById('mission');
+  var missionBg = document.getElementById('missionBg');
+  var missionEyebrow = document.getElementById('missionEyebrow');
+  var missionTitle = document.getElementById('missionTitle');
+  var missionText = document.getElementById('missionText');
+  var missionList = document.getElementById('missionList');
+  var missionGo = document.getElementById('missionGo');
+  var missionBack = document.getElementById('missionBack');
+  var lastFocused = null;
+
+  function openMission(key, originEl){
+    var d = DATA[key];
+    if(!d) return;
+    lastFocused = originEl;
+
+    var rect = originEl.getBoundingClientRect();
+    var ox = ((rect.left+rect.width/2)/window.innerWidth*100).toFixed(1)+'%';
+    var oy = ((rect.top+rect.height/2)/window.innerHeight*100).toFixed(1)+'%';
+    wipe.style.setProperty('--ox', ox);
+    wipe.style.setProperty('--oy', oy);
+    wipe.style.setProperty('--acc', d.wipe);
+
+    wipe.classList.remove('out');
+    wipe.classList.add('run');
+
+    mission.querySelector('.mission-panel').style.setProperty('--acc', d.acc);
+    missionBg.style.background = d.bgGrad;
+    missionEyebrow.textContent = d.eyebrow;
+    missionTitle.textContent = d.title;
+    missionText.textContent = d.text;
+    missionList.innerHTML = '';
+    for(var i=0;i<d.items.length;i+=2){
+      var li = document.createElement('li');
+      li.innerHTML = '<span>'+d.items[i]+'</span><span class="tag">'+(d.items[i+1]||'')+'</span>';
+      missionList.appendChild(li);
+    }
+
+    setTimeout(function(){ mission.classList.add('active'); missionBack.focus(); }, 480);
+  }
+
+  function closeMission(){
+    var rect = lastFocused ? lastFocused.getBoundingClientRect() : {left:window.innerWidth/2,top:window.innerHeight/2,width:0,height:0};
+    var ox = ((rect.left+rect.width/2)/window.innerWidth*100).toFixed(1)+'%';
+    var oy = ((rect.top+rect.height/2)/window.innerHeight*100).toFixed(1)+'%';
+    wipe.style.setProperty('--ox', ox);
+    wipe.style.setProperty('--oy', oy);
+
+    mission.classList.remove('active');
+    wipe.classList.remove('run');
+    wipe.classList.add('out');
+
+    setTimeout(function(){ wipe.classList.remove('out'); if(lastFocused) lastFocused.focus(); }, 520);
+  }
+
+  document.querySelectorAll('.tile').forEach(function(tile){
+    tile.addEventListener('click', function(){ openMission(tile.getAttribute('data-mission'), tile); });
+  });
+
+  missionBack.addEventListener('click', closeMission);
+  missionGo.addEventListener('click', closeMission);
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && mission.classList.contains('active')) closeMission();
+  });
+})();
+</script>
+</body>
+</html>
